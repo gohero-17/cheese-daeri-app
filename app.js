@@ -34,6 +34,8 @@ const state = {
   undo: new Set(),  // 승인 처리 중에 '되돌리기'를 누른 id (승인이 끝나면 바로 취소)
   justApproved: new Set(), // 이 화면에서 방금 승인한 id (되돌리기 안내)
   openCaptions: new Set(),
+  specs: new Map(),  // reel.json 경로 → 읽은 내용 (스레드 글)
+  copied: new Map(), // 복사 버튼 → 잠깐 보여 줄 안내
   thumbs: new Map(),
   loadedAt: 0,
 };
@@ -331,7 +333,49 @@ function captionEl(item) {
       class: 'link-btn', type: 'button', 'aria-expanded': open ? 'true' : 'false',
       on: { click: () => { open ? state.openCaptions.delete(item.id) : state.openCaptions.add(item.id); render(); } },
     }, open ? '캡션 접기' : '캡션 전체 보기'),
+    // 인스타·스레드에 직접 올릴 때 쓰는 복사 버튼
+    h('div', { class: 'copy-row' },
+      copyButton(item, 'caption', '캡션 복사', async () => item.caption || ''),
+      copyButton(item, 'threads', '스레드 글 복사', async () => (await reelSpec(item))?.threads?.text || '')),
   ];
+}
+
+// 회차 설정(reel.json)은 스레드 글을 꺼낼 때만 읽는다
+function reelSpec(item) {
+  const path = `reels/${item.persona}/${item.ep}/reel.json`;
+  if (!state.specs.has(path)) state.specs.set(path, readFile(path, null).catch(() => null));
+  return state.specs.get(path);
+}
+
+function copyButton(item, kind, label, getText) {
+  const key = `${item.id}:${kind}`;
+  const done = state.copied.get(key);
+  return h('button', {
+    class: 'link-btn', type: 'button',
+    on: { click: async () => {
+      const text = await getText();
+      if (!text) { flashCopied(key, kind === 'threads' ? '이 회차는 스레드 글이 아직 없어요' : '캡션이 없어요'); return; }
+      try {
+        await navigator.clipboard.writeText(text);
+        flashCopied(key, '복사했어요 ✓');
+      } catch {
+        openCopy(label, text);   // 복사가 막힌 브라우저: 글을 보여 주고 직접 길게 눌러 복사
+      }
+    } },
+  }, done || label);
+}
+
+function flashCopied(key, message) {
+  state.copied.set(key, message);
+  render();
+  setTimeout(() => { state.copied.delete(key); render(); }, 2500);
+}
+
+function openCopy(label, text) {
+  $('copy-title').textContent = label;
+  $('copy-text').value = text;
+  $('copy-dialog').showModal();
+  $('copy-text').select();
 }
 
 function renderMe() {
@@ -476,6 +520,7 @@ function init() {
     if (store.get(key) === 'closed') d.open = false;
     d.addEventListener('toggle', () => store.set(key, d.open ? 'open' : 'closed'));
   }
+  $('copy-close').addEventListener('click', () => $('copy-dialog').close());
   $('redo-cancel').addEventListener('click', () => $('redo-dialog').close());
   $('redo-form').addEventListener('submit', (e) => {
     e.preventDefault();

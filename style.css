@@ -168,3 +168,5 @@ dialog textarea { border: 1px solid #CDD3DB; border-radius: 10px; padding: 10px 
 .undo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; background: #FFFFFF; border: 2px solid var(--ok); border-radius: 12px; padding: 10px 12px; font-size: 14px; font-weight: 600; }
 .undo > span:first-child { flex: 1 1 180px; }
 .undo .ghost-text { color: var(--muted); }
+.copy-row { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+#copy-dialog textarea { width: 100%; }
