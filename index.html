@@ -72,22 +72,22 @@
         </div>
         <span id="todo-count" class="pill"></span>
       </div>
-      <div>
-        <h3>영상 승인 · 약 1분씩</h3>
+      <details class="fold" data-fold="reviews" open>
+        <summary><h3>영상 승인 · 약 1분씩</h3><span id="reviews-count" class="fold-count"></span></summary>
         <div id="reviews" class="cards"></div>
-      </div>
-      <div id="alerts-wrap" hidden>
-        <h3>확인이 필요한 것</h3>
+      </details>
+      <details id="alerts-wrap" class="fold" data-fold="alerts" open hidden>
+        <summary><h3>확인이 필요한 것</h3><span id="alerts-count" class="fold-count"></span></summary>
         <div id="alerts" class="cards"></div>
-      </div>
-      <div id="scheduled-wrap" hidden>
-        <h3>예약됨 · 취소할 수 있어요</h3>
+      </details>
+      <details id="scheduled-wrap" class="fold" data-fold="scheduled" open hidden>
+        <summary><h3>예약됨 · 취소할 수 있어요</h3><span id="scheduled-count" class="fold-count"></span></summary>
         <div id="scheduled" class="cards"></div>
-      </div>
-      <div id="setup-wrap" hidden>
-        <h3>처음 한 번만 · 설정</h3>
+      </details>
+      <details id="setup-wrap" class="fold" data-fold="setup" open hidden>
+        <summary><h3>처음 한 번만 · 설정</h3><span id="setup-count" class="fold-count"></span></summary>
         <ul id="setup" class="setup"></ul>
-      </div>
+      </details>
     </section>
   </main>
 </div>

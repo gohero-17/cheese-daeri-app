@@ -154,3 +154,12 @@ dialog ol { padding-left: 20px; margin: 6px 0; }
 .player p, .player a { margin-top: 8px; display: block; }
 dialog textarea { border: 1px solid #CDD3DB; border-radius: 10px; padding: 10px 12px; font-family: inherit; font-size: 15px; resize: vertical; min-height: 96px; }
 #redo-cancel { color: var(--muted); }
+.fold > summary { list-style: none; display: flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; border-radius: 10px; margin: -4px 0 4px; }
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary h3 { margin: 0; }
+.fold > summary::after { content: ""; margin-left: auto; width: 9px; height: 9px; border-right: 2px solid var(--me-strong); border-bottom: 2px solid var(--me-strong); transform: rotate(45deg); transition: transform .15s; margin-right: 6px; }
+.fold:not([open]) > summary::after { transform: rotate(-45deg); }
+.fold > summary:focus-visible { outline: 2px solid var(--me-strong); outline-offset: 2px; }
+.fold-count { font-size: 12px; font-weight: 700; color: var(--me-strong); background: #FFFFFF; border: 1px solid var(--me-line); border-radius: 999px; padding: 1px 8px; }
+.fold-count:empty { display: none; }
+.fold[hidden] { display: none; }

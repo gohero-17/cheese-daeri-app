@@ -368,11 +368,14 @@ function renderMe() {
           : h('button', { class: 'primary', type: 'button', on: { click: () => dispatch('approve', [t.id]) } }, '다시 예약')),
         videoButton(item)));
   }).filter(Boolean);
+  $('reviews-count').textContent = reviews.length ? `${reviews.length}편` : (remaking.length ? '다시 만드는 중' : '');
   $('alerts-wrap').hidden = !alerts.length;
+  $('alerts-count').textContent = `${alerts.length}건`;
   $('alerts').replaceChildren(...alerts);
 
   const scheduled = items.filter((i) => i.status === 'approved').sort((a, b) => (a.slot || '').localeCompare(b.slot || ''));
   $('scheduled-wrap').hidden = !scheduled.length;
+  $('scheduled-count').textContent = `${scheduled.length}편`;
   $('scheduled').replaceChildren(...scheduled.map((item) => h('article', { class: 'card' },
     thumbEl(item),
     h('div', { class: 'card-body' },
@@ -395,6 +398,8 @@ function renderMe() {
     return !owner || state.persona === 'all' || owner === state.persona;
   });
   $('setup-wrap').hidden = !setup.length;
+  const left = setup.filter((s) => !s.done).length;
+  $('setup-count').textContent = left ? `${left}개 남음` : '모두 완료';
   $('setup').replaceChildren(...setup.map((s) => h('li', { class: s.done ? 'ok' : '' },
     h('span', { class: 'check', 'aria-hidden': 'true' }),
     h('span', { class: 'setup-text' },
@@ -441,6 +446,12 @@ function init() {
   $('tab-auto').addEventListener('click', () => { state.view = 'auto'; store.set('view', 'auto'); renderView(); });
   $('refresh').addEventListener('click', load);
   $('player-close').addEventListener('click', () => $('player').close());
+  // 접었다 펴기: 칸마다 마지막 상태를 기억한다
+  for (const d of document.querySelectorAll('details[data-fold]')) {
+    const key = 'fold:' + d.dataset.fold;
+    if (store.get(key) === 'closed') d.open = false;
+    d.addEventListener('toggle', () => store.set(key, d.open ? 'open' : 'closed'));
+  }
   $('redo-cancel').addEventListener('click', () => $('redo-dialog').close());
   $('redo-form').addEventListener('submit', (e) => {
     e.preventDefault();
