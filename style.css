@@ -136,3 +136,11 @@ dialog ol { padding-left: 20px; margin: 6px 0; }
   .panel { padding: 16px; }
 }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.working { font-size: 14px; font-weight: 700; color: var(--auto-ink); display: flex; align-items: center; gap: 8px; }
+.working::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--auto-strong); animation: pulse 1.2s ease-in-out infinite; flex: none; }
+@keyframes pulse { 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) { .working::before { animation: none; } }
+.chip { display: inline-flex; align-items: center; gap: 6px; }
+.chip-count { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--me-strong); color: #FFFFFF; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+.chip-count.zero { background: #E3E6EA; color: #4A525C; }
+.chip[aria-pressed="true"] .chip-count.zero { background: #4A525C; color: #FFFFFF; }

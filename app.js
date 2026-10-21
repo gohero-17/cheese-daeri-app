@@ -33,6 +33,7 @@ const state = {
   pending: {},      // id → 'approve' | 'redo' | 'unapprove' (워크플로 처리 중)
   openCaptions: new Set(),
   thumbs: new Map(),
+  loadedAt: 0,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -139,6 +140,7 @@ async function load() {
     state.queue = queue;
     state.log = log;
     state.runs = runs;
+    state.loadedAt = Date.now();
     // 워크플로가 처리를 끝낸 항목은 "처리 중" 표시를 지운다
     for (const [id, action] of Object.entries(state.pending)) {
       const item = queue.items.find((i) => i.id === id);
@@ -198,10 +200,17 @@ function visible(item) {
 function renderPersonas() {
   const personas = state.status?.personas || {};
   const options = [['all', '전체'], ...Object.entries(personas)];
-  $('personas').replaceChildren(...options.map(([id, label]) => h('button', {
-    class: 'chip', type: 'button', 'aria-pressed': state.persona === id ? 'true' : 'false',
-    on: { click: () => { state.persona = id; store.set('persona', id); render(); } },
-  }, label)));
+  // 버튼마다 지금 걸려 있는 영상 수 (승인 대기·다시 만드는 중·예약·실패)
+  const active = state.queue.items.filter((i) => ['review', 'redo', 'approved', 'failed'].includes(i.status));
+  const countFor = (id) => active.filter((i) => id === 'all' || i.persona === id).length;
+  $('personas').replaceChildren(...options.map(([id, label]) => {
+    const n = countFor(id);
+    return h('button', {
+      class: 'chip', type: 'button', 'aria-pressed': state.persona === id ? 'true' : 'false',
+      'aria-label': `${label} 영상 ${n}개`,
+      on: { click: () => { state.persona = id; store.set('persona', id); render(); } },
+    }, label, h('span', { class: n ? 'chip-count' : 'chip-count zero', 'aria-hidden': 'true' }, String(n)));
+  }));
 }
 
 function renderAuto() {
@@ -225,6 +234,7 @@ function renderAuto() {
   $('running').replaceChildren(...runningBox);
 
   const pipeline = state.status?.pipeline || [];
+  $('pipeline-note').hidden = state.persona === 'all';
   $('pipeline').replaceChildren(...(pipeline.length ? pipeline.map((s) => {
     const label = { done: '완료', run: '진행 중', wait: '대기' }[s.state] || s.state;
     return h('li', { class: `step s-${s.state}` },
@@ -273,7 +283,16 @@ function captionEl(item) {
 function renderMe() {
   const items = state.queue.items.filter(visible);
   const reviews = items.filter((i) => i.status === 'review');
-  $('reviews').replaceChildren(...(reviews.length ? reviews.map((item) => {
+  // 다시 만드는 중인 영상도 같은 자리에 남겨 두고, 끝나면 승인 버튼이 돌아온다
+  const remaking = items.filter((i) => i.status === 'redo');
+  const remakingCards = remaking.map((item) => h('article', { class: 'card' },
+    thumbEl(item),
+    h('div', { class: 'card-body' },
+      h('div', { class: 'meta' }, h('span', { class: 'tag' }, personaName(item.persona)), `${item.ep}화`),
+      h('h4', {}, item.title || item.id),
+      h('p', { class: 'working', role: 'status' }, '다시 만드는 중… 보통 4~5분 걸려요'),
+      h('p', { class: 'muted' }, '끝나면 이 자리에 새 영상과 승인 버튼이 다시 나타납니다. 지금은 할 일이 없어요.'))));
+  $('reviews').replaceChildren(...remakingCards, ...(reviews.length || remaking.length ? reviews.map((item) => {
     const pending = state.pending[item.id];
     return h('article', { class: 'card' },
       thumbEl(item),
@@ -287,7 +306,9 @@ function renderMe() {
             h('button', { class: 'primary', type: 'button', on: { click: () => dispatch('approve', [item.id]) } }, '승인 · 빈 시간에 예약'),
             h('button', { class: 'secondary', type: 'button', on: { click: () => dispatch('redo', [item.id]) } }, '다시 만들기'),
             h('a', { class: 'secondary', href: releaseUrl(item), target: '_blank', rel: 'noopener' }, '영상 보기'))));
-  }) : [h('p', { class: 'empty' }, '승인할 영상이 없습니다. 새 영상이 완성되면 여기에 나타납니다.')]));
+  }) : [h('p', { class: 'empty' }, state.persona === 'all'
+    ? '승인할 영상이 없습니다. 새 영상이 완성되면 여기에 나타납니다.'
+    : `${personaName(state.persona)}: 아직 승인할 영상이 없습니다. "전체"를 누르면 모든 페르소나가 보입니다.`)]));
 
   const todo = (state.status?.todo || []).filter((t) => t.type !== 'review');
   const alerts = todo.map((t) => {
@@ -397,7 +418,13 @@ function init() {
   });
   render();
   load();
-  setInterval(() => { if (document.visibilityState === 'visible' && state.token) load(); }, REFRESH_MS);
+  // 다시 만드는 중이거나 실행 중인 작업이 있으면 30초, 아니면 1분마다 새로 읽는다
+  setInterval(() => {
+    if (document.visibilityState !== 'visible' || !state.token) return;
+    const busy = state.queue.items.some((i) => i.status === 'redo')
+      || state.runs.some((r) => r.status === 'in_progress' || r.status === 'queued');
+    if (Date.now() - state.loadedAt >= (busy ? 30000 : REFRESH_MS)) load();
+  }, 10000);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && state.token) load(); });
 }
 
