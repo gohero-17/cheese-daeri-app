@@ -369,7 +369,15 @@ function renderMe() {
           : h('button', { class: 'secondary', type: 'button', on: { click: () => dispatch('unapprove', [item.id]) } }, '예약 취소'),
         videoButton(item))))));
 
-  const setup = state.status?.setup || [];
+  // 설정 항목 중 'sheet-<페르소나>', 'ig-<페르소나>' 는 그 페르소나 것. 나머지(API 키, 인스타 토큰 등)는 공통이라 항상 보인다
+  const setupPersona = (s) => {
+    const m = /^(sheet|ig)-(.+)$/.exec(s.id || '');
+    return m && state.status?.personas?.[m[2]] ? m[2] : null;
+  };
+  const setup = (state.status?.setup || []).filter((s) => {
+    const owner = setupPersona(s);
+    return !owner || state.persona === 'all' || owner === state.persona;
+  });
   $('setup-wrap').hidden = !setup.length;
   $('setup').replaceChildren(...setup.map((s) => h('li', { class: s.done ? 'ok' : '' },
     h('span', { class: 'check', 'aria-hidden': 'true' }),
