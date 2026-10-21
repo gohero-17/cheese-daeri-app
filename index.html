@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://api.github.com; img-src 'self' blob: data:; style-src 'self'; script-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#F4F5F7">
+<title>릴스 운영 현황판</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="stylesheet" href="style.css">
+<script src="app.js" defer></script>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="title">
+      <h1>릴스 운영 현황판</h1>
+      <p id="updated" class="muted">불러오는 중…</p>
+    </div>
+    <div class="top-actions">
+      <button id="refresh" class="ghost" type="button" aria-label="새로고침">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"></path><path d="M20 4v7h-7"></path></svg>
+      </button>
+      <button id="open-settings" class="ghost" type="button" aria-label="설정">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"></path></svg>
+      </button>
+    </div>
+  </header>
+
+  <nav id="personas" class="chips" aria-label="페르소나"></nav>
+
+  <div class="tabs" role="group" aria-label="보기 전환">
+    <button id="tab-auto" type="button" aria-pressed="false">자동 영역</button>
+    <button id="tab-me" type="button" aria-pressed="true">내가 할 일 <span id="tab-count"></span></button>
+  </div>
+
+  <p id="error" class="error" role="alert" hidden></p>
+
+  <main class="cols" data-view="me">
+    <section class="panel auto" aria-labelledby="auto-title">
+      <div class="panel-head">
+        <div class="badge-icon auto-icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7" width="16" height="12" rx="3"></rect><path d="M12 7V4"></path><circle cx="12" cy="3" r="1"></circle><circle cx="9" cy="13" r="1.2"></circle><circle cx="15" cy="13" r="1.2"></circle></svg>
+        </div>
+        <div>
+          <h2 id="auto-title">자동 영역</h2>
+          <p class="sub">Claude와 프로그램이 하는 일 · 손대지 않아도 됩니다</p>
+        </div>
+      </div>
+      <div id="running"></div>
+      <ol id="pipeline" class="steps"></ol>
+      <div>
+        <h3>방금 일어난 일</h3>
+        <ul id="log" class="log"></ul>
+      </div>
+    </section>
+
+    <section class="panel me" aria-labelledby="me-title">
+      <div class="panel-head between">
+        <div class="row">
+          <div class="badge-icon me-icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V12"></path><path d="M11 11.5V4a1.5 1.5 0 0 1 3 0v7.5"></path><path d="M14 11.5V6a1.5 1.5 0 0 1 3 0v8a6 6 0 0 1-6 6h-1a6 6 0 0 1-5-2.7l-2.2-3.5a1.5 1.5 0 0 1 2.5-1.6L8 15"></path></svg>
+          </div>
+          <div>
+            <h2 id="me-title">내가 할 일</h2>
+            <p class="sub">지금 결정이 필요한 것만 모았습니다</p>
+          </div>
+        </div>
+        <span id="todo-count" class="pill"></span>
+      </div>
+      <div>
+        <h3>영상 승인 · 약 1분씩</h3>
+        <div id="reviews" class="cards"></div>
+      </div>
+      <div id="alerts-wrap" hidden>
+        <h3>확인이 필요한 것</h3>
+        <div id="alerts" class="cards"></div>
+      </div>
+      <div id="scheduled-wrap" hidden>
+        <h3>예약됨 · 취소할 수 있어요</h3>
+        <div id="scheduled" class="cards"></div>
+      </div>
+      <div id="setup-wrap" hidden>
+        <h3>처음 한 번만 · 설정</h3>
+        <ul id="setup" class="setup"></ul>
+      </div>
+    </section>
+  </main>
+</div>
+
+<dialog id="settings">
+  <form id="settings-form" method="dialog">
+    <h2>연결 설정</h2>
+    <p class="muted">이 휴대폰(브라우저)에만 저장됩니다. 토큰 만드는 방법은 아래 안내를 따르세요.</p>
+    <label for="repo">저장소</label>
+    <input id="repo" name="repo" autocomplete="off" spellcheck="false" placeholder="gohero-17/cheese-daeri" required>
+    <label for="token">GitHub 토큰</label>
+    <input id="token" name="token" type="password" autocomplete="off" spellcheck="false" placeholder="github_pat_…" required>
+    <details>
+      <summary>토큰 만드는 방법 (5분)</summary>
+      <ol>
+        <li>GitHub → Settings → Developer settings → Personal access tokens → <b>Fine-grained tokens</b> → Generate new token</li>
+        <li>Repository access: <b>Only select repositories</b> → cheese-daeri 하나만</li>
+        <li>Permissions → Repository: <b>Actions: Read and write</b>, <b>Contents: Read-only</b> (Metadata는 자동)</li>
+        <li>만료 기간은 원하는 만큼 (만료되면 여기서 새로 넣기)</li>
+      </ol>
+    </details>
+    <p id="settings-msg" class="muted" role="status"></p>
+    <div class="row gap">
+      <button id="save-settings" class="primary" type="submit">저장하고 연결</button>
+      <button id="forget" class="ghost-text" type="button">이 기기에서 지우기</button>
+    </div>
+  </form>
+</dialog>
+</body>
+</html>
