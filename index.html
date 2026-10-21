@@ -104,6 +104,20 @@
   <a id="player-github" href="#" target="_blank" rel="noopener" class="muted">GitHub에서 원본 보기 (고화질)</a>
 </dialog>
 
+<dialog id="redo-dialog" aria-labelledby="redo-heading">
+  <form id="redo-form" method="dialog">
+    <h2 id="redo-heading">다시 만들기</h2>
+    <p id="redo-title" class="muted"></p>
+    <label for="redo-note">무엇을 고칠까요? (선택)</label>
+    <textarea id="redo-note" rows="4" maxlength="300" placeholder="예: 집이니까 셔츠 대신 회색 티셔츠로 / 라떼를 실제로 마시는 장면으로 / 자막 두 번째 줄을 더 짧게"></textarea>
+    <p class="muted">비워 두면 같은 설명으로 한 번 더 뽑습니다. 적으면 Claude가 장면·동작(필요하면 옷차림·자막)을 고쳐서 다시 만듭니다. 약 0.26달러.</p>
+    <div class="row gap">
+      <button class="primary" type="submit">다시 만들기</button>
+      <button id="redo-cancel" class="ghost-text" type="button">취소</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="settings">
   <form id="settings-form" method="dialog">
     <h2>연결 설정</h2>

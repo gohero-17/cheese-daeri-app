@@ -167,14 +167,21 @@ async function load() {
   }
 }
 
-async function dispatch(action, ids) {
+async function dispatch(action, ids, note = '') {
   for (const id of ids) state.pending[id] = action;
   render();
   try {
-    await api('actions/workflows/ops.yml/dispatches', {
-      method: 'POST',
-      body: { ref: BRANCH, inputs: { action, ids: ids.join(' ') } },
-    });
+    const inputs = { action, ids: ids.join(' ') };
+    if (note) inputs.note = note;
+    try {
+      await api('actions/workflows/ops.yml/dispatches', { method: 'POST', body: { ref: BRANCH, inputs } });
+    } catch (e) {
+      // 수정 요청 기능이 아직 워크플로에 없으면(422) 요청 없이 다시 만들기만 보낸다
+      if (!(note && e.status === 422)) throw e;
+      delete inputs.note;
+      await api('actions/workflows/ops.yml/dispatches', { method: 'POST', body: { ref: BRANCH, inputs } });
+      showError('수정 요청 기능이 아직 켜지지 않아(PR 병합 필요) 요청 없이 다시 만들기만 했습니다.');
+    }
     // 워크플로가 끝날 때까지 10초마다 다시 읽는다 (최대 3분)
     let tries = 0;
     const timer = setInterval(async () => {
@@ -282,6 +289,15 @@ function videoButton(item) {
   return h('button', { class: 'secondary', type: 'button', on: { click: () => openPlayer(item) } }, '▶ 영상 보기');
 }
 
+// 다시 만들기: 고칠 점을 적으면 Claude가 그 회차의 장면·동작(필요하면 옷차림·자막)을 고쳐서 다시 만든다
+function openRedo(item) {
+  state.redoTarget = item;
+  $('redo-title').textContent = `${personaName(item.persona)} ${item.ep}화 · ${item.title || ''}`;
+  $('redo-note').value = '';
+  $('redo-dialog').showModal();
+  $('redo-note').focus();
+}
+
 async function openPlayer(item) {
   if (!item.preview) { window.open(releaseUrl(item), '_blank', 'noopener'); return; }
   const video = $('player-video');
@@ -332,7 +348,7 @@ function renderMe() {
           ? h('p', { class: 'done-text', role: 'status' }, pending === 'approve' ? '승인 처리 중… (30초쯤 걸려요)' : '다시 만들기 요청 중…')
           : h('div', { class: 'actions' },
             h('button', { class: 'primary', type: 'button', on: { click: () => dispatch('approve', [item.id]) } }, '승인 · 빈 시간에 예약'),
-            h('button', { class: 'secondary', type: 'button', on: { click: () => dispatch('redo', [item.id]) } }, '다시 만들기'),
+            h('button', { class: 'secondary', type: 'button', on: { click: () => openRedo(item) } }, '다시 만들기'),
             videoButton(item))));
   }) : [h('p', { class: 'empty' }, state.persona === 'all'
     ? '승인할 영상이 없습니다. 새 영상이 완성되면 여기에 나타납니다.'
@@ -425,6 +441,14 @@ function init() {
   $('tab-auto').addEventListener('click', () => { state.view = 'auto'; store.set('view', 'auto'); renderView(); });
   $('refresh').addEventListener('click', load);
   $('player-close').addEventListener('click', () => $('player').close());
+  $('redo-cancel').addEventListener('click', () => $('redo-dialog').close());
+  $('redo-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const item = state.redoTarget;
+    const note = $('redo-note').value.trim();
+    $('redo-dialog').close();
+    if (item) dispatch('redo', [item.id], note);
+  });
   $('player').addEventListener('close', () => $('player-video').pause());
   $('open-settings').addEventListener('click', () => openSettings());
   $('settings-form').addEventListener('submit', (e) => {
