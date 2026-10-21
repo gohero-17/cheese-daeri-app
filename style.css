@@ -163,3 +163,8 @@ dialog textarea { border: 1px solid #CDD3DB; border-radius: 10px; padding: 10px 
 .fold-count { font-size: 12px; font-weight: 700; color: var(--me-strong); background: #FFFFFF; border: 1px solid var(--me-line); border-radius: 999px; padding: 1px 8px; }
 .fold-count:empty { display: none; }
 .fold[hidden] { display: none; }
+.undo-bar { display: flex; flex-direction: column; gap: 8px; }
+.undo-bar:empty { display: none; }
+.undo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; background: #FFFFFF; border: 2px solid var(--ok); border-radius: 12px; padding: 10px 12px; font-size: 14px; font-weight: 600; }
+.undo > span:first-child { flex: 1 1 180px; }
+.undo .ghost-text { color: var(--muted); }

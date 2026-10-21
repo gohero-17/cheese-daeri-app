@@ -31,6 +31,8 @@ const state = {
   log: [],
   runs: [],
   pending: {},      // id → 'approve' | 'redo' | 'unapprove' (워크플로 처리 중)
+  undo: new Set(),  // 승인 처리 중에 '되돌리기'를 누른 id (승인이 끝나면 바로 취소)
+  justApproved: new Set(), // 이 화면에서 방금 승인한 id (되돌리기 안내)
   openCaptions: new Set(),
   thumbs: new Map(),
   loadedAt: 0,
@@ -142,16 +144,24 @@ async function load() {
     state.runs = runs;
     state.loadedAt = Date.now();
     // 워크플로가 처리를 끝낸 항목은 "처리 중" 표시를 지운다
+    const undoLater = [];
     for (const [id, action] of Object.entries(state.pending)) {
       const item = queue.items.find((i) => i.id === id);
       const settled = !item
         || (action === 'approve' && item.status !== 'review' && item.status !== 'failed')
         || (action === 'redo' && item.status === 'redo')
         || (action === 'unapprove' && item.status === 'review');
-      if (settled) delete state.pending[id];
+      if (!settled) continue;
+      delete state.pending[id];
+      if (action === 'approve' && item?.status === 'approved') {
+        if (state.undo.delete(id)) undoLater.push(id);
+        else state.justApproved.add(id);
+      }
+      if (action === 'unapprove') state.justApproved.delete(id);
     }
     showError('');
     render();
+    if (undoLater.length) dispatch('unapprove', undoLater);
     $('updated').textContent = status
       ? `상태 갱신 ${fmtTime(status.updated_at)} · 화면 ${fmtTime(new Date().toISOString(), false)}`
       : '아직 상태 파일이 없습니다. 첫 "릴스 만들기"가 끝나면 채워집니다.';
@@ -345,7 +355,11 @@ function renderMe() {
         h('h4', {}, item.title || item.id),
         captionEl(item),
         pending
-          ? h('p', { class: 'done-text', role: 'status' }, pending === 'approve' ? '승인 처리 중… (30초쯤 걸려요)' : '다시 만들기 요청 중…')
+          ? (pending === 'approve'
+            ? h('div', { class: 'actions' },
+              h('p', { class: 'done-text', role: 'status' }, state.undo.has(item.id) ? '되돌리는 중… 승인이 끝나는 대로 취소해요' : '승인 처리 중… (30초쯤 걸려요)'),
+              !state.undo.has(item.id) && h('button', { class: 'secondary', type: 'button', on: { click: () => { state.undo.add(item.id); render(); } } }, '되돌리기'))
+            : h('p', { class: 'done-text', role: 'status' }, '다시 만들기 요청 중…'))
           : h('div', { class: 'actions' },
             h('button', { class: 'primary', type: 'button', on: { click: () => dispatch('approve', [item.id]) } }, '승인 · 빈 시간에 예약'),
             h('button', { class: 'secondary', type: 'button', on: { click: () => openRedo(item) } }, '다시 만들기'),
@@ -353,6 +367,16 @@ function renderMe() {
   }) : [h('p', { class: 'empty' }, state.persona === 'all'
     ? '승인할 영상이 없습니다. 새 영상이 완성되면 여기에 나타납니다.'
     : `${personaName(state.persona)}: 아직 승인할 영상이 없습니다. "전체"를 누르면 모든 페르소나가 보입니다.`)]));
+
+  // 방금 승인한 영상: 잘못 눌렀으면 바로 되돌릴 수 있게 맨 위에 안내
+  const recent = [...state.justApproved].map((id) => state.queue.items.find((i) => i.id === id))
+    .filter((i) => i && i.status === 'approved' && visible(i));
+  $('undo-bar').replaceChildren(...recent.map((item) => h('div', { class: 'undo', role: 'status' },
+    h('span', {}, `${personaName(item.persona)} ${item.ep}화 승인 → ${fmtTime(item.slot)} 발행 예약`),
+    state.pending[item.id]
+      ? h('span', { class: 'done-text' }, '취소 중…')
+      : h('button', { class: 'secondary', type: 'button', on: { click: () => dispatch('unapprove', [item.id]) } }, '승인 취소'),
+    h('button', { class: 'ghost-text', type: 'button', 'aria-label': '안내 닫기', on: { click: () => { state.justApproved.delete(item.id); render(); } } }, '닫기'))));
 
   const todo = (state.status?.todo || []).filter((t) => t.type !== 'review');
   const alerts = todo.map((t) => {
@@ -385,7 +409,7 @@ function renderMe() {
       h('div', { class: 'actions' },
         state.pending[item.id]
           ? h('span', { class: 'done-text' }, '취소 처리 중…')
-          : h('button', { class: 'secondary', type: 'button', on: { click: () => dispatch('unapprove', [item.id]) } }, '예약 취소'),
+          : h('button', { class: 'secondary', type: 'button', on: { click: () => dispatch('unapprove', [item.id]) } }, '승인 취소 · 다시 검토로'),
         videoButton(item))))));
 
   // 설정 항목 중 'sheet-<페르소나>', 'ig-<페르소나>' 는 그 페르소나 것. 나머지(API 키, 인스타 토큰 등)는 공통이라 항상 보인다
