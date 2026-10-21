@@ -259,14 +259,42 @@ function renderAuto() {
 
 const PLAY_SVG = '<svg width="26" height="26" viewBox="0 0 24 24" fill="#FFFFFF" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"></path></svg>';
 
-// 미리보기: 우선 재생 아이콘 자리를 그리고, 이미지가 오면 바꿔 넣는다
+// 미리보기: 우선 재생 아이콘 자리를 그리고, 이미지가 오면 바꿔 넣는다. 누르면 바로 재생
 function thumbEl(item) {
-  const box = h('div', { class: 'thumb thumb-empty' });
+  const box = h('button', { class: 'thumb thumb-empty thumb-btn', type: 'button', 'aria-label': `${item.title} 영상 재생`, on: { click: () => openPlayer(item) } });
   box.innerHTML = PLAY_SVG;
   thumbUrl(item.thumb).then((url) => {
-    if (url) box.replaceWith(h('img', { class: 'thumb', src: url, alt: `${item.title} 미리보기`, width: 72, height: 128 }));
+    if (!url) return;
+    const img = h('img', { class: 'thumb', src: url, alt: '', width: 72, height: 128 });
+    const play = h('span', { class: 'thumb-play', 'aria-hidden': 'true' });
+    play.innerHTML = PLAY_SVG;
+    box.classList.remove('thumb-empty');
+    box.replaceChildren(img, play);
   });
   return box;
+}
+
+// 현황판 안에서 재생 (ops/previews 의 작은 영상). 미리보기가 없는 회차는 GitHub 페이지로
+function videoButton(item) {
+  if (!item.preview) {
+    return h('a', { class: 'secondary', href: releaseUrl(item), target: '_blank', rel: 'noopener' }, '영상 보기 (GitHub)');
+  }
+  return h('button', { class: 'secondary', type: 'button', on: { click: () => openPlayer(item) } }, '▶ 영상 보기');
+}
+
+async function openPlayer(item) {
+  if (!item.preview) { window.open(releaseUrl(item), '_blank', 'noopener'); return; }
+  const video = $('player-video');
+  $('player-title').textContent = `${personaName(item.persona)} ${item.ep}화 · ${item.title || ''}`;
+  $('player-github').href = releaseUrl(item);
+  $('player-msg').textContent = '영상 불러오는 중…';
+  video.removeAttribute('src');
+  if (!$('player').open) $('player').showModal();
+  const url = await thumbUrl(item.preview);
+  if (!url) { $('player-msg').textContent = '영상을 불러오지 못했습니다. 아래 "GitHub에서 원본 보기"를 눌러 주세요.'; return; }
+  $('player-msg').textContent = '';
+  video.src = url;
+  video.play().catch(() => { /* 자동 재생이 막히면 재생 버튼을 누르면 된다 */ });
 }
 
 function captionEl(item) {
@@ -305,7 +333,7 @@ function renderMe() {
           : h('div', { class: 'actions' },
             h('button', { class: 'primary', type: 'button', on: { click: () => dispatch('approve', [item.id]) } }, '승인 · 빈 시간에 예약'),
             h('button', { class: 'secondary', type: 'button', on: { click: () => dispatch('redo', [item.id]) } }, '다시 만들기'),
-            h('a', { class: 'secondary', href: releaseUrl(item), target: '_blank', rel: 'noopener' }, '영상 보기'))));
+            videoButton(item))));
   }) : [h('p', { class: 'empty' }, state.persona === 'all'
     ? '승인할 영상이 없습니다. 새 영상이 완성되면 여기에 나타납니다.'
     : `${personaName(state.persona)}: 아직 승인할 영상이 없습니다. "전체"를 누르면 모든 페르소나가 보입니다.`)]));
@@ -322,7 +350,7 @@ function renderMe() {
         t.type === 'failed' && (pending
           ? h('span', { class: 'done-text' }, '다시 예약 중…')
           : h('button', { class: 'primary', type: 'button', on: { click: () => dispatch('approve', [t.id]) } }, '다시 예약')),
-        h('a', { class: 'secondary', href: releaseUrl(item), target: '_blank', rel: 'noopener' }, '영상 보기')));
+        videoButton(item)));
   }).filter(Boolean);
   $('alerts-wrap').hidden = !alerts.length;
   $('alerts').replaceChildren(...alerts);
@@ -339,7 +367,7 @@ function renderMe() {
         state.pending[item.id]
           ? h('span', { class: 'done-text' }, '취소 처리 중…')
           : h('button', { class: 'secondary', type: 'button', on: { click: () => dispatch('unapprove', [item.id]) } }, '예약 취소'),
-        h('a', { class: 'secondary', href: releaseUrl(item), target: '_blank', rel: 'noopener' }, '영상 보기'))))));
+        videoButton(item))))));
 
   const setup = state.status?.setup || [];
   $('setup-wrap').hidden = !setup.length;
@@ -388,6 +416,8 @@ function init() {
   $('tab-me').addEventListener('click', () => { state.view = 'me'; store.set('view', 'me'); renderView(); });
   $('tab-auto').addEventListener('click', () => { state.view = 'auto'; store.set('view', 'auto'); renderView(); });
   $('refresh').addEventListener('click', load);
+  $('player-close').addEventListener('click', () => $('player').close());
+  $('player').addEventListener('close', () => $('player-video').pause());
   $('open-settings').addEventListener('click', () => openSettings());
   $('settings-form').addEventListener('submit', (e) => {
     e.preventDefault();
