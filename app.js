@@ -37,6 +37,12 @@ const state = {
 
 const $ = (id) => document.getElementById(id);
 
+// 붙여넣을 때 섞여 들어오는 공백·보이지 않는 문자를 지운다. 남은 글자가 토큰에 쓰이지 않는 글자면 null
+function cleanToken(raw) {
+  const token = (raw || '').replace(/[\s\u00A0\u200B-\u200D\u2060\uFEFF]/g, '');
+  return /^[A-Za-z0-9_]+$/.test(token) ? token : null;
+}
+
 // textContent만 쓰는 작은 DOM 도우미 (저장소 내용은 모두 글자로만 넣는다)
 function h(tag, attrs = {}, ...children) {
   const el = document.createElement(tag);
@@ -120,6 +126,7 @@ async function thumbUrl(path) {
 
 async function load() {
   if (!state.token) { openSettings('GitHub 토큰을 넣어 주세요.'); return; }
+  if (!cleanToken(state.token)) { openSettings('저장된 토큰에 토큰이 아닌 글자가 섞여 있습니다. 다시 붙여넣어 주세요.'); return; }
   $('updated').textContent = '불러오는 중…';
   try {
     const [status, queue, log, runs] = await Promise.all([
@@ -365,8 +372,17 @@ function init() {
     e.preventDefault();
     const repo = $('repo').value.trim().replace(/^https:\/\/github\.com\//, '').replace(/\/$/, '');
     if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) { $('settings-msg').textContent = '저장소는 "계정/이름" 형식으로 넣어 주세요.'; return; }
+    const token = cleanToken($('token').value);
+    if (!token) {
+      $('settings-msg').textContent = '토큰에 한글이나 "…" 같은 다른 글자가 섞여 있습니다. 칸을 비우고 github_pat_ 로 시작하는 값만 다시 붙여넣어 주세요.';
+      return;
+    }
+    if (!/^(github_pat_|ghp_)/.test(token)) {
+      $('settings-msg').textContent = '토큰은 github_pat_ 로 시작합니다. 복사한 값이 맞는지 확인해 주세요.';
+      return;
+    }
     state.repo = repo;
-    state.token = $('token').value.trim();
+    state.token = token;
     store.set('repo', state.repo);
     store.set('token', state.token);
     state.thumbs.clear();
