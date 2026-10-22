@@ -82,6 +82,11 @@ function releaseUrl(item) {
   return `https://github.com/${state.repo}/releases/tag/${encodeURIComponent(item.release_tag)}`;
 }
 
+// 원본 영상 파일 바로 받기 (GitHub 에 로그인한 브라우저에서 받아진다)
+function downloadUrl(item) {
+  return `https://github.com/${state.repo}/releases/download/${encodeURIComponent(item.release_tag)}/${encodeURIComponent(item.asset || `${item.id}.mp4`)}`;
+}
+
 // ---------- GitHub API ----------
 
 class ApiError extends Error {
@@ -343,6 +348,7 @@ function captionEl(item) {
 // 인스타·스레드에 직접 올릴 때 쓰는 복사 버튼
 function copyRow(item) {
   return h('div', { class: 'copy-row' },
+    h('a', { class: 'link-btn', href: downloadUrl(item), target: '_blank', rel: 'noopener' }, '원본 영상 받기'),
     copyButton(item, 'caption', '캡션 복사', async () => item.caption || ''),
     copyButton(item, 'threads', '스레드 글 복사', async () => (await reelSpec(item))?.threads?.text || ''));
 }
