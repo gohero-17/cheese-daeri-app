@@ -152,7 +152,8 @@ async function load() {
       const settled = !item
         || (action === 'approve' && item.status !== 'review' && item.status !== 'failed')
         || (action === 'redo' && item.status === 'redo')
-        || (action === 'unapprove' && item.status === 'review');
+        || (action === 'unapprove' && item.status === 'review')
+        || (action === 'manual' && item.status === 'published');
       if (!settled) continue;
       delete state.pending[id];
       if (action === 'approve' && item?.status === 'approved') {
@@ -206,6 +207,8 @@ async function dispatch(action, ids, note = '') {
     render();
     showError(e.status === 403
       ? '버튼을 실행할 권한이 없습니다. 토큰에 Actions: Read and write 권한이 있는지 확인하세요.'
+      : e.status === 422 && action === 'manual'
+      ? '"직접 올렸어요" 기능이 아직 켜지지 않았어요 (PR 병합 필요).'
       : `요청 실패: ${e.message}`);
   }
 }
@@ -333,11 +336,22 @@ function captionEl(item) {
       class: 'link-btn', type: 'button', 'aria-expanded': open ? 'true' : 'false',
       on: { click: () => { open ? state.openCaptions.delete(item.id) : state.openCaptions.add(item.id); render(); } },
     }, open ? '캡션 접기' : '캡션 전체 보기'),
-    // 인스타·스레드에 직접 올릴 때 쓰는 복사 버튼
-    h('div', { class: 'copy-row' },
-      copyButton(item, 'caption', '캡션 복사', async () => item.caption || ''),
-      copyButton(item, 'threads', '스레드 글 복사', async () => (await reelSpec(item))?.threads?.text || '')),
+    copyRow(item),
   ];
+}
+
+// 인스타·스레드에 직접 올릴 때 쓰는 복사 버튼
+function copyRow(item) {
+  return h('div', { class: 'copy-row' },
+    copyButton(item, 'caption', '캡션 복사', async () => item.caption || ''),
+    copyButton(item, 'threads', '스레드 글 복사', async () => (await reelSpec(item))?.threads?.text || ''));
+}
+
+// 인스타 앱·Business Suite 로 직접 올렸거나 예약했으면 눌러서 발행 완료로 기록 (자동 발행이 다시 올리지 않게)
+function manualButton(item) {
+  return h('button', { class: 'secondary', type: 'button', on: { click: () => {
+    if (confirm(`${personaName(item.persona)} ${item.ep}화를 직접 올렸거나 예약했나요?\n발행 완료로 기록하면 자동 발행에서 빠집니다.`)) dispatch('manual', [item.id]);
+  } } }, '직접 올렸어요');
 }
 
 // 회차 설정(reel.json)은 스레드 글을 꺼낼 때만 읽는다
@@ -403,11 +417,12 @@ function renderMe() {
             ? h('div', { class: 'actions' },
               h('p', { class: 'done-text', role: 'status' }, state.undo.has(item.id) ? '되돌리는 중… 승인이 끝나는 대로 취소해요' : '승인 처리 중… (30초쯤 걸려요)'),
               !state.undo.has(item.id) && h('button', { class: 'secondary', type: 'button', on: { click: () => { state.undo.add(item.id); render(); } } }, '되돌리기'))
-            : h('p', { class: 'done-text', role: 'status' }, '다시 만들기 요청 중…'))
+            : h('p', { class: 'done-text', role: 'status' }, pending === 'manual' ? '발행 완료로 기록 중…' : '다시 만들기 요청 중…'))
           : h('div', { class: 'actions' },
             h('button', { class: 'primary', type: 'button', on: { click: () => dispatch('approve', [item.id]) } }, '승인 · 빈 시간에 예약'),
             h('button', { class: 'secondary', type: 'button', on: { click: () => openRedo(item) } }, '다시 만들기'),
-            videoButton(item))));
+            videoButton(item),
+            manualButton(item))));
   }) : [h('p', { class: 'empty' }, state.persona === 'all'
     ? '승인할 영상이 없습니다. 새 영상이 완성되면 여기에 나타납니다.'
     : `${personaName(state.persona)}: 아직 승인할 영상이 없습니다. "전체"를 누르면 모든 페르소나가 보입니다.`)]));
@@ -432,9 +447,11 @@ function renderMe() {
       h('p', {}, t.hint),
       item && h('div', { class: 'actions' },
         t.type === 'failed' && (pending
-          ? h('span', { class: 'done-text' }, '다시 예약 중…')
+          ? h('span', { class: 'done-text' }, pending === 'manual' ? '발행 완료로 기록 중…' : '다시 예약 중…')
           : h('button', { class: 'primary', type: 'button', on: { click: () => dispatch('approve', [t.id]) } }, '다시 예약')),
-        videoButton(item)));
+        videoButton(item),
+        t.type === 'failed' && !pending && manualButton(item)),
+      item && copyRow(item));
   }).filter(Boolean);
   $('reviews-count').textContent = reviews.length ? `${reviews.length}편` : (remaking.length ? '다시 만드는 중' : '');
   $('alerts-wrap').hidden = !alerts.length;
@@ -450,6 +467,7 @@ function renderMe() {
       h('div', { class: 'meta' }, h('span', { class: 'tag' }, personaName(item.persona)), `${item.ep}화`),
       h('h4', {}, item.title || item.id),
       h('p', { class: 'done-text' }, `${fmtTime(item.slot)} 자동 발행`),
+      copyRow(item),
       h('div', { class: 'actions' },
         state.pending[item.id]
           ? h('span', { class: 'done-text' }, '취소 처리 중…')
